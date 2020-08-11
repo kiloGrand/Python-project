@@ -1,0 +1,92 @@
+查看版本：cat /etc/redhat-release
+
+方法1：（生产模式）
+1.添加一个用户
+	adduser grand	#新增用户
+	passwd grand	#修改密码
+	gpasswd -a grand wheel	#添加到sudo用户组
+	su grand	#切换到grand用户
+
+2.初始化环境
+	sudo yum install epel-release	#初始化仓库
+	sudo yum install gcc nginx	#安装gcc和Nginx
+
+3.创建虚拟环境
+	pip3 install virtualenv		#安装virtualebnv
+	mkdir /home/grand/textweb		#新建目录
+	cd /home/grand/textweb		#进入目录
+	virtualenv textenv		#创建虚拟环境目录
+	source textenv/bin/activate	#激活新创建的虚拟环境
+	(deactivate		#退出虚拟环境)
+
+4.初始化一个简单的flask项目
+	pip3 install flask gunicorn	#安装flask和gunicorn
+	vim hello.py		#新建一个flask文件
+	python text.py		#启动测试flask服务
+
+5.启动gunicorn服务
+	打开防火墙5000端口：	开启防火墙 service firewalld start（查看防火墙状态 systemctl status firewalld  开启防火墙 systemctl start firewalld  ）
+				添加指定需要开放的端口：firewall-cmd --add-port=5000/tcp --permanent
+				（移除指定端口：firewall-cmd --permanent --remove-port=123/tcp）
+				重载入添加的端口：firewall-cmd --reload
+				查询指定端口是否开启成功：firewall-cmd --query-port=5000/tcp
+
+	gunicorn -w 2 -b :5000 hello:app	启动gunicorn服务
+	-w指的是处理请求的进程数，-b指的是绑定本机的ip，可以省略不写，使用的端口是5000
+	hello:app指的是hello.py中的flask app，更多参数可以参照gunicorn -h
+	浏览器访问：http://xxxxxxxx:5000
+	ctrl+c		退出gunicorn服务
+
+6.配置nginx
+	cp /etc/nginx/nginx.conf /etc/nginx/nginx.conf.bak	备份
+	sudo vim /etc/nginx/nginx.conf			编辑
+
+# 如果有多台服务器的话，可以使用upstream
+# flask是组名，可以写其他的
+upstream flask {
+    server 10.211.55.2:5000;
+    server 10.211.55.2:5001;
+}
+
+server {
+    listen       80;
+    server_name  localhost;  # 改为自己的域名，如果没有域名就修改为127.0.0.1
+    
+    # charset koi8-r;
+    
+    # access_log  logs/host.access.log  main;
+    
+    location / {
+        proxy_pass http://10.211.55.2:5000;  # 此处可以写单个主机信息(前面的gunicorn启动的ip地址)，也可以写upstream的组名。
+        # proxy_pass http://flask;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+}
+
+	sudo systemctl start nginx.service	启动nginx
+	gunicorn -w 2 -b :5000 hello:app	启动gunicorn服务
+	（sudo systemctl stop nginx.service	关闭nginx	）
+	（ctrl+c				退出gunicorn服务）
+	
+
+8.创建进程管理
+	pip3 install supervisor	安装supervisor
+	vim /etc/supervisor/conf.d/gunicorn.conf	配置gunicorn文件
+	vim /etc/supervisor/conf.d/nginx.conf		配置nginx文件
+	/etc/init.d/supervisor start			启动supervisor
+	ps ax | grep nginx				查看进程是否打开
+	ps ax | grep gunicorn
+
+
+
+方法2：（开发模式，虚拟环境下virtualenv）
+配置flask项目：	app.run(host='0.0.0.0',port=5000)
+打开防火墙5000端口：	开启防火墙 service firewalld start（查看防火墙状态 systemctl status firewalld  开启防火墙 systemctl start firewalld  ）
+			添加指定需要开放的端口：firewall-cmd --add-port=5000/tcp --permanent
+			（移除指定端口：firewall-cmd --permanent --remove-port=123/tcp）
+			重载入添加的端口：firewall-cmd --reload
+			查询指定端口是否开启成功：firewall-cmd --query-port=5000/tcp
+
+	
+
